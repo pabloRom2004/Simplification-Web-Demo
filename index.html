@@ -1,86 +1,133 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Text Simplification Demo</title>
-    <link rel="stylesheet" href="styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/@huggingface/transformers"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Text Simplification Demo</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:,">
 </head>
 <body>
-    <div class="container">
-        <h1>Text Simplification Demo</h1>
-        
-        <div class="models-section">
-            <div class="model-status">
-                <h3>Models:</h3>
-                <div class="model-item">
-                    <span class="model-name">pabRomero/BART-Firefox-Simplification-Elementary-ONNX</span>
-                    <span id="elementary-status" class="status pending">Pending</span>
-                </div>
-                <div class="model-item">
-                    <span class="model-name">pabRomero/BART-Firefox-Simplification-Secondary-ONNX</span>
-                    <span id="secondary-status" class="status pending">Pending</span>
-                </div>
-                <div class="model-item">
-                    <span class="model-name">pabRomero/BART-Firefox-Simplification-Advanced-ONNX</span>
-                    <span id="advanced-status" class="status pending">Pending</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="input-section">
-            <div class="input-wrapper">
-                <textarea id="inputText" placeholder="Enter text to simplify..." aria-label="Text to simplify"></textarea>
-                <div class="button-group">
-                    <button id="randomButton" class="primary-button">Random Sentence</button>
-                    <button id="simplifyButton" class="primary-button">Simplify Text</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="controls-section">
-            <div class="control-group">
-                <label for="quantization">Model Quantization:</label>
-                <select id="quantization" aria-label="Quantization level">
-                    <option value="int8">int8 (default - fastest)</option>
-                    <option value="float32">float32 (full precision)</option>
-                    <option value="bnb4">bnb4 (4-bit - smallest)</option>
-                </select>
-            </div>
-        </div>
-
-        <div id="loadingIndicator" class="loading-indicator hidden">
-            <div class="spinner"></div>
-            <p>Processing text...</p>
-        </div>
-
-        <div class="results-section">
-            <div class="results-container">
-                <div class="result-group">
-                    <div class="result-label">Original:</div>
-                    <div id="original-text" class="result-content"></div>
-                </div>
-                
-                <div class="result-group">
-                    <div id="elementary-label" class="result-label">Elementary (int8):</div>
-                    <div id="elementary-output" class="result-content"></div>
-                </div>
-
-                <div class="result-group">
-                    <div id="secondary-label" class="result-label">Secondary (int8):</div>
-                    <div id="secondary-output" class="result-content"></div>
-                </div>
-
-                <div class="result-group">
-                    <div id="advanced-label" class="result-label">Advanced (int8):</div>
-                    <div id="advanced-output" class="result-content"></div>
-                </div>
-            </div>
-        </div>
-
-        <div id="errorMessage" class="error-message hidden"></div>
+  <!-- Splash Screen for Quantization Selection -->
+  <div id="splashScreen" class="splash-screen">
+    <div class="splash-content">
+      <h2>Select Quantization Level</h2>
+      <p>
+        Please select a quantization level for model loading (WebGPU will be used).
+        This cannot be changed without reloading the page.
+      </p>
+      <div class="quant-options">
+        <button class="quant-button" data-quant="fp32">Full-Precision (fp32)</button>
+        <button class="quant-button" data-quant="int8">8-bit (int8)</button>
+        <button class="quant-button" data-quant="bnb4">4-bit (bnb4)</button>
+      </div>
     </div>
-    <script src="script.js"></script>
+  </div>
+
+  <!-- Main UI (hidden until quantization is chosen) -->
+  <div id="mainUI" class="hidden">
+    <div class="container">
+      <h1>Text Simplification Demo</h1>
+      <p id="currentQuantLabel"></p>
+
+      <div class="models-section">
+        <h3>Models:</h3>
+        
+        <!-- Elementary Model -->
+        <div class="model-item" id="model-elementary">
+          <div class="model-info">
+            <span class="model-name">pabRomero/BART-Firefox-Simplification-Elementary-ONNX</span>
+          </div>
+          <div class="download-option">
+            <span class="quant-label" id="elementary-quant-label"></span>
+            <span id="elementary-status" class="status pending">Pending</span>
+            <span id="elementary-size" class="model-size"></span>
+            <div class="download-container">
+              <button id="elementary-download" class="download-button">Download Model</button>
+              <div id="elementary-progress" class="progress-bar hidden">
+                <div class="progress"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Secondary Model -->
+        <div class="model-item" id="model-secondary">
+          <div class="model-info">
+            <span class="model-name">pabRomero/BART-Firefox-Simplification-Secondary-ONNX</span>
+          </div>
+          <div class="download-option">
+            <span class="quant-label" id="secondary-quant-label"></span>
+            <span id="secondary-status" class="status pending">Pending</span>
+            <span id="secondary-size" class="model-size"></span>
+            <div class="download-container">
+              <button id="secondary-download" class="download-button">Download Model</button>
+              <div id="secondary-progress" class="progress-bar hidden">
+                <div class="progress"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Advanced Model -->
+        <div class="model-item" id="model-advanced">
+          <div class="model-info">
+            <span class="model-name">pabRomero/BART-Firefox-Simplification-Advanced-ONNX</span>
+          </div>
+          <div class="download-option">
+            <span class="quant-label" id="advanced-quant-label"></span>
+            <span id="advanced-status" class="status pending">Pending</span>
+            <span id="advanced-size" class="model-size"></span>
+            <div class="download-container">
+              <button id="advanced-download" class="download-button">Download Model</button>
+              <div id="advanced-progress" class="progress-bar hidden">
+                <div class="progress"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="input-section">
+        <div class="input-wrapper">
+          <textarea id="inputText" placeholder="Enter text to simplify..." aria-label="Text to simplify"></textarea>
+          <div class="button-group">
+            <button id="randomButton" class="primary-button">Random Sentence</button>
+            <button id="simplifyButton" class="primary-button">Simplify Text</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="loadingIndicator" class="loading-indicator hidden">
+        <div class="spinner"></div>
+        <p>Processing text...</p>
+      </div>
+
+      <div class="results-section">
+        <div class="results-container">
+          <div class="result-group">
+            <div class="result-label">Original:</div>
+            <div id="original-text" class="result-content"></div>
+          </div>
+          <div class="result-group">
+            <div id="elementary-label" class="result-label">Elementary:</div>
+            <div id="elementary-output" class="result-content"></div>
+          </div>
+          <div class="result-group">
+            <div id="secondary-label" class="result-label">Secondary:</div>
+            <div id="secondary-output" class="result-content"></div>
+          </div>
+          <div class="result-group">
+            <div id="advanced-label" class="result-label">Advanced:</div>
+            <div id="advanced-output" class="result-content"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="errorMessage" class="error-message hidden"></div>
+    </div>
+  </div>
+
+  <script type="module" src="script.js"></script>
 </body>
 </html>
