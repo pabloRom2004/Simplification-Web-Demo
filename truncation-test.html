@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Neutral Token Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.5; }
+    #results { white-space: pre-wrap; background: #f5f5f5; padding: 10px; border-radius: 5px; overflow: auto; max-height: 600px; font-family: monospace; }
+    .options { margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 5px; }
+    button { padding: 8px 16px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #0b7dda; }
+    .option-group { margin-bottom: 10px; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; }
+    select, input { padding: 8px; width: 100%; box-sizing: border-box; }
+  </style>
+</head>
+<body>
+  <h1>Neutral Token Test</h1>
+  
+  <div class="options">
+    <div class="option-group">
+      <label for="modelId">Model ID:</label>
+      <input type="text" id="modelId" value="pabRomero/BART-Firefox-Simplification-Elementary-ONNX">
+    </div>
+    
+    <div class="option-group">
+      <label for="quantization">Quantization:</label>
+      <select id="quantization">
+        <option value="fp32">fp32</option>
+        <option value="int8">int8</option>
+        <option value="bnb4">bnb4</option>
+      </select>
+    </div>
+    
+    <button id="runTests">Run Tests</button>
+  </div>
+  
+  <pre id="results">Results will appear here...</pre>
+  
+  <script type="module">
+    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3/dist/transformers.min.js';
+    
+    // Problematic starting words (based on your example)
+    const TEST_SENTENCES = [
+      "It has long been the economic centre of northern Nigeria.",
+      "A student wrote this paper for the class assignment.",
+      "This experiment produced interesting results for the research.",
+      "We are going to the store tomorrow morning.",
+      "They decided to implement the new policy immediately.",
+      "She walked to the library to study for her exam.",
+      "I think we should consider other options before deciding.",
+      "You need to finish your homework before going out."
+    ];
+    
+    // Potential neutral tokens to test
+    const NEUTRAL_TOKENS = [
+      { name: "No prefix (baseline)", token: "" },
+      { name: "Space", token: " " },
+      { name: "Period", token: "." },
+      { name: "Period + Space", token: ". " },
+      { name: "The + Space", token: "The " },
+      { name: "Newline", token: "\n" },
+      { name: "Tab", token: "\t" },
+      { name: "### ", token: "### " },
+      { name: "<s>", token: "<s>" },
+      { name: "<bos>", token: "<bos>" },
+      { name: "||", token: "||" },
+      { name: ". . .", token: ". . . " },
+      { name: "\u200B", token: "\u200B" /* Zero-width space */ },
+      { name: "` ", token: "` " },
+      { name: "- ", token: "- " }
+    ];
+    
+    async function runTests() {
+      const resultsElement = document.getElementById('results');
+      const modelId = document.getElementById('modelId').value;
+      const quantization = document.getElementById('quantization').value;
+      
+      resultsElement.textContent = `Loading model ${modelId} with quantization ${quantization}...\n`;
+      
+      try {
+        const model = await pipeline(
+          'text2text-generation',
+          modelId,
+          { dtype: quantization }
+        );
+        
+        resultsElement.textContent += "Model loaded successfully. Beginning tests...\n\n";
+        
+        const results = [];
+        
+        // Test configurations - focus on the one we know works well
+        const config = {
+          max_length: 80,
+          max_new_tokens: 80,
+          do_sample: false,
+          num_beams: 4,
+          decoder_start_token_id: 0,
+          forced_eos_token_id: 2
+        };
+        
+        for (const sentence of TEST_SENTENCES) {
+          resultsElement.textContent += `\nTesting with sentence: "${sentence}"\n`;
+          
+          for (const { name, token } of NEUTRAL_TOKENS) {
+            const processedText = token + sentence;
+            resultsElement.textContent += `  Using token: "${name}"\n`;
+            
+            try {
+              const result = await model(processedText, config);
+              const simplified = result[0].generated_text;
+              
+              // Check if token appears in output 
+              const tokenLeakage = simplified.includes(token) && token.trim() !== "" && 
+                                   !sentence.startsWith(token.trim());
+              
+              // Check for truncation 
+              const firstChar = simplified.charAt(0);
+              const firstWord = simplified.split(/\s+/)[0].toLowerCase();
+              const startsWithLowercase = firstChar === firstChar.toLowerCase() && 
+                                       !['i'].includes(firstWord);
+              
+              resultsElement.textContent += `    Result: "${simplified}"\n`;
+              resultsElement.textContent += `    Token leakage: ${tokenLeakage ? 'YES' : 'NO'}\n`;
+              resultsElement.textContent += `    Truncation: ${startsWithLowercase ? 'YES' : 'NO'}\n`;
+              
+              results.push({
+                sentence,
+                firstWord: sentence.split(/\s+/)[0],
+                tokenName: name,
+                token,
+                output: simplified,
+                leakage: tokenLeakage,
+                truncation: startsWithLowercase
+              });
+            } catch (error) {
+              resultsElement.textContent += `    Error: ${error.message}\n`;
+            }
+          }
+        }
+        
+        // Analyze the results to find the best neutral token
+        const analysis = analyzeResults(results);
+        resultsElement.textContent += analysis;
+        
+      } catch (error) {
+        resultsElement.textContent += `Failed to load model: ${error}\n`;
+      }
+    }
+    
+    function analyzeResults(results) {
+      let output = "\n\n=============== SUMMARY ===============\n";
+      
+      // Group by token
+      const tokenResults = {};
+      
+      for (const { tokenName } of NEUTRAL_TOKENS) {
+        const tokenTests = results.filter(r => r.tokenName === tokenName);
+        if (tokenTests.length === 0) continue;
+        
+        const leakageCount = tokenTests.filter(r => r.leakage).length;
+        const truncationCount = tokenTests.filter(r => r.truncation).length;
+        const issueCount = tokenTests.filter(r => r.leakage || r.truncation).length;
+        
+        tokenResults[tokenName] = {
+          total: tokenTests.length,
+          leakage: leakageCount,
+          truncation: truncationCount,
+          issues: issueCount,
+          leakageRate: leakageCount / tokenTests.length,
+          truncationRate: truncationCount / tokenTests.length,
+          issueRate: issueCount / tokenTests.length
+        };
+      }
+      
+      output += "Token effectiveness summary:\n";
+      Object.entries(tokenResults)
+        .sort((a, b) => a[1].issueRate - b[1].issueRate)
+        .forEach(([name, stats]) => {
+          output += `  "${name}":\n`;
+          output += `    Total Tests: ${stats.total}\n`;
+          output += `    Leakage: ${stats.leakage} (${(stats.leakageRate * 100).toFixed(1)}%)\n`;
+          output += `    Truncation: ${stats.truncation} (${(stats.truncationRate * 100).toFixed(1)}%)\n`;
+          output += `    Overall Issues: ${stats.issues} (${(stats.issueRate * 100).toFixed(1)}%)\n`;
+        });
+      
+      // Find the best token overall
+      const bestToken = Object.entries(tokenResults)
+        .sort((a, b) => a[1].issueRate - b[1].issueRate)[0];
+        
+      output += `\nBest neutral token: "${bestToken[0]}" with ${(bestToken[1].issueRate * 100).toFixed(1)}% issues\n`;
+      
+      // Check if effectiveness varies by first word
+      output += "\nEffectiveness by starting word:\n";
+      const wordGroups = {};
+      
+      results.forEach(result => {
+        const firstWord = result.firstWord;
+        if (!wordGroups[firstWord]) {
+          wordGroups[firstWord] = [];
+        }
+        wordGroups[firstWord].push(result);
+      });
+      
+      Object.entries(wordGroups).forEach(([word, wordResults]) => {
+        output += `  Starting with "${word}":\n`;
+        
+        const wordTokenResults = {};
+        for (const { tokenName } of NEUTRAL_TOKENS) {
+          const tokenTests = wordResults.filter(r => r.tokenName === tokenName);
+          if (tokenTests.length === 0) continue;
+          
+          const issueCount = tokenTests.filter(r => r.leakage || r.truncation).length;
+          wordTokenResults[tokenName] = {
+            issues: issueCount,
+            issueRate: issueCount / tokenTests.length
+          };
+        }
+        
+        // Show best tokens for this word
+        const bestForWord = Object.entries(wordTokenResults)
+          .sort((a, b) => a[1].issueRate - b[1].issueRate)
+          .slice(0, 3);
+          
+        bestForWord.forEach(([name, stats]) => {
+          output += `    "${name}": ${(stats.issueRate * 100).toFixed(1)}% issues\n`;
+        });
+      });
+      
+      // Implementation suggestion
+      output += "\nRecommended implementation:\n";
+      output += "```javascript\n";
+      output += `async simplifyText(model, text) {\n`;
+      output += `    try {\n`;
+      output += `        const pipelineInstance = this.modelInstances[model];\n`;
+      output += `        if (!pipelineInstance) {\n`;
+      output += `            throw new Error("Model instance not loaded");\n`;
+      output += `        }\n\n`;
+      output += `        // Add the neutral token "${bestToken[0]}" to prevent truncation issues\n`;
+      output += `        const processedText = "${bestToken[1].leakageRate === 0 ? bestToken[0].replace(/"/g, '\\"') : 'The '}" + text;\n\n`;
+      output += `        const generationConfig = {\n`;
+      output += `            max_length: 80,\n`;
+      output += `            max_new_tokens: 80,\n`;
+      output += `            do_sample: false,\n`;
+      output += `            num_beams: 4,\n`;
+      output += `            decoder_start_token_id: 0,\n`;
+      output += `            forced_eos_token_id: 2\n`;
+      output += `        };\n\n`;
+      output += `        const result = await pipelineInstance(processedText, generationConfig);\n`;
+      output += `        return result[0].generated_text;\n`;
+      output += `    } catch (error) {\n`;
+      output += `        throw new Error("Failed to simplify text: " + error.message);\n`;
+      output += `    }\n`;
+      output += `}\n`;
+      output += "```\n";
+      
+      return output;
+    }
+    
+    document.getElementById('runTests').addEventListener('click', runTests);
+  </script>
+</body>
+</html>

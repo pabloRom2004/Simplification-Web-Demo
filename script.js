@@ -507,24 +507,27 @@ class TextSimplifier {
             if (!pipelineInstance) {
                 throw new Error(`Model instance not loaded for ${model}`);
             }
-
+    
+            // Add "The " prefix to prevent truncation issues
+            const processedText = "" + text;
+    
             // Combined config for both input & output constraints + generation style:
             const generationConfig = {
                 // 1) Truncate the *input* to 80 tokens
                 truncation: true,
                 max_length: 80,
-
+    
                 // 2) Generate up to 80 new tokens
                 max_new_tokens: 80,
-
+    
                 // 3) Beam search / no-sampling BART settings
                 do_sample: false,
-                decoder_start_token_id: 2,
-                forced_eos_token_id: 2,        // BART typically uses eos=2
+                decoder_start_token_id: 0,  // Changed from 2 to 0 to prevent truncation
+                forced_eos_token_id: 2,     // BART typically uses eos=2
                 num_beams: 4,
             };
-
-            const result = await pipelineInstance(text, generationConfig);
+    
+            const result = await pipelineInstance(processedText, generationConfig);
             return result[0].generated_text;
         } catch (error) {
             throw new Error(`Failed to simplify text with ${model} model`);
