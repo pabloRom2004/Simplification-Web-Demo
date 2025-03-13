@@ -25,9 +25,9 @@ class TextSimplifier {
 
         // Dummy model sizes based on quant
         this.modelSizes = {
-            elementary: { fp32: '540 MB', fp16: '250 MB', int8: '150 MB', bnb4: '212 MB' },
-            secondary: { fp32: '540 MB', fp16: '200 MB', int8: '150 MB', bnb4: '212 MB' },
-            advanced: { fp32: '540 MB', fp16: '350 MB', int8: '150 MB', bnb4: '212 MB' }
+            elementary: { fp32: '540 MB', fp16: '250 MB', int8: '136 MB', bnb4: '212 MB' },
+            secondary: { fp32: '540 MB', fp16: '200 MB', int8: '136 MB', bnb4: '212 MB' },
+            advanced: { fp32: '540 MB', fp16: '350 MB', int8: '136 MB', bnb4: '212 MB' }
         };
 
         this.sentences = [];
