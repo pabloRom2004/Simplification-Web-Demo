@@ -13,8 +13,8 @@
     <div class="splash-content">
       <h2>Select Quantization Level</h2>
       <p>
-        Please select a quantization level for model loading (WebGPU will be used).
-        This cannot be changed without reloading the page.
+        Please select a quantization level for model loading.
+        This cannot be changed without returning to this selection screen.
       </p>
       <div class="quant-options">
         <button class="quant-button" data-quant="fp32">Full-Precision (fp32)</button>
@@ -28,7 +28,11 @@
   <div id="mainUI" class="hidden">
     <div class="container">
       <h1>Text Simplification Demo</h1>
-      <p id="currentQuantLabel"></p>
+      
+      <div class="quant-controls">
+        <p id="currentQuantLabel"></p>
+        <button id="returnToSelectButton" class="primary-button">Return to Selection Screen</button>
+      </div>
 
       <div class="models-section">
         <h3>Models:</h3>
@@ -104,6 +108,10 @@
       </div>
 
       <div class="results-section">
+        <div id="highlightToggle" class="highlight-toggle hidden">
+          <input type="checkbox" id="highlightCheckbox" checked>
+          <label for="highlightCheckbox">Show sentence mapping highlights</label>
+        </div>
         <div class="results-container">
           <div class="result-group">
             <div class="result-label">Original:</div>
