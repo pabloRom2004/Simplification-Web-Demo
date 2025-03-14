@@ -507,9 +507,8 @@ class TextSimplifier {
             if (!pipelineInstance) {
                 throw new Error(`Model instance not loaded for ${model}`);
             }
-    
-            // Add "The " prefix to prevent truncation issues
-            const processedText = "" + text;
+            
+            const processedText = text;
     
             // Combined config for both input & output constraints + generation style:
             const generationConfig = {
