@@ -568,7 +568,7 @@ class TextSimplifier {
             document.getElementById('inputText').value = this.sentences[randomIndex];
         }
         
-        this.handleTextChange();
+        // this.handleTextChange();
     }
 
     clearOutputs() {

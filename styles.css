@@ -260,6 +260,7 @@ textarea {
     white-space: pre-wrap;
     font-family: inherit;
     line-height: 1.6;
+    color: var(--text-color); /* Explicit text color */
 }
 
 .not-downloaded-output {
@@ -285,6 +286,7 @@ textarea {
     border-radius: 2px;
     padding: 2px 0;
     margin-right: 4px;
+    color: var(--text-color) !important; /* Force solid text color */
 }
 
 .highlighted-sentence:hover {
@@ -444,8 +446,8 @@ textarea {
   .highlight-toggle.hidden {
     display: none;
   }
-  
-  /* Class to disable highlighting when toggle is off */
+
   .no-highlight .highlighted-sentence {
     background-color: transparent !important;
-  }
+    color: var(--text-color) !important; /* Keep text visible when highlight is off */
+}
